@@ -1,0 +1,23 @@
+version: "2.1"
+
+services:
+  # POSTGRESQL DB
+  postgres:
+    container_name: postgres_facturacion
+    image: postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: og23barber
+      POSTGRES_USER: ${DB_USERNAME:-admin}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-password}
+    volumes:
+       - ./data/postgres:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - app-network
+
+# NETWORKS
+networks:
+  app-network:
+    driver: bridge
