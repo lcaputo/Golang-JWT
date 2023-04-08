@@ -6,7 +6,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-//go:embed settings.yaml
+// go:embed settings.yaml
 var settingsFile []byte
 
 type DatabaseConfig struct {

@@ -1,8 +1,10 @@
 package helpers
 
 import (
+	"elprogramador.co/go/echo/structs"
 	"encoding/json"
 	"github.com/labstack/echo/v4"
+	"net/http"
 	"reflect"
 	"strings"
 )
@@ -79,7 +81,12 @@ func ParseKeyValueString(str string) string {
 	return string(jsonData)
 }
 
-func BindAndValidate(c echo.Context, u interface{}) any {
+func BindAndValidate(c echo.Context, u interface{}) error {
+	response := structs.Response{
+		Status:  http.StatusBadRequest,
+		Message: "Invalid form",
+		Data:    nil,
+	}
 	if err := c.Bind(u); err != nil {
 		errors := ParseKeyValueString(err.Error())
 		syntaxErrorResponse := SyntaxErrorResponse{}
@@ -87,14 +94,16 @@ func BindAndValidate(c echo.Context, u interface{}) any {
 			return err
 		}
 		if syntaxErrorResponse.Error != "" {
-			return &syntaxErrorResponse
+			response.Data = syntaxErrorResponse
+			return echo.NewHTTPError(400, response)
 		}
 		invalidTypeResponse := InvalidTypeResponse{}
 		if err := json.Unmarshal([]byte(errors), &invalidTypeResponse); err != nil {
 			return err
 		}
 		if invalidTypeResponse.Field != "" || invalidTypeResponse.Got != "" || invalidTypeResponse.Expected != "" {
-			return &invalidTypeResponse
+			response.Data = invalidTypeResponse
+			return echo.NewHTTPError(400, response)
 		}
 	}
 	if err := c.Validate(u); err != nil {

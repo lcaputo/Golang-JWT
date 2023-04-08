@@ -1,7 +1,6 @@
 package main
 
 import (
-	"elprogramador.co/go/echo/handlers"
 	"elprogramador.co/go/echo/helpers"
 	"elprogramador.co/go/echo/structs"
 	"encoding/base64"
@@ -84,7 +83,7 @@ func main() {
 	key, _ := jwt.ParseRSAPublicKeyFromPEM(keyData)
 	config := echojwt.Config{
 		NewClaimsFunc: func(c echo.Context) jwt.Claims {
-			return new(handlers.JwtCustomClaims)
+			return new(structs.JwtCustomClaims)
 		},
 		SigningKey:    key,
 		SigningMethod: "RS256",

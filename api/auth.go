@@ -19,7 +19,7 @@ func Register(c echo.Context) error {
 	u := new(models.User)
 
 	if err := helpers.BindAndValidate(c, u); err != nil {
-		return SendResponse(c, http.StatusBadRequest, "Invalid form", err)
+		return err
 	}
 
 	var exist models.User
