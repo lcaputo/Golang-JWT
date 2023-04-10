@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+
+<body>
+
+</body>
+<script>
+    function generateUUID() {
+        let dt = new Date().getTime();
+        const uuid = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+            const r = (dt + Math.random() * 16) % 16 | 0;
+            dt = Math.floor(dt / 16);
+            return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+        });
+        return uuid;
+    }
+    let id = generateUUID()
+    let source = new EventSource(`http://localhost:1323/api/v1/chat?id=${id}`);
+
+    source.addEventListener("saludar", function (event) {
+        console.log(event);
+    }, false);
+
+    source.addEventListener("NewMessage", function (event) {
+        console.log(event);
+    }, false);
+
+    source.addEventListener("open", function (event) {
+        console.log("Connection was opened.");
+    }, false);
+
+    source.addEventListener("error", function (event) {
+        if (event.readyState == EventSource.CLOSED) {
+            console.log("Connection was closed.");
+        }
+    }, false);
+</script>
+
+</html>

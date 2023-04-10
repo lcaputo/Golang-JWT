@@ -1,18 +1,23 @@
 package main
 
 import (
+	"context"
+	"elprogramador.co/go/echo/database"
 	"elprogramador.co/go/echo/helpers"
+	"elprogramador.co/go/echo/middleware"
+	"elprogramador.co/go/echo/models"
+	"elprogramador.co/go/echo/routes"
 	"elprogramador.co/go/echo/structs"
-	"encoding/base64"
-	echojwt "github.com/labstack/echo-jwt/v4"
+	"github.com/joho/godotenv"
+	"log"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"elprogramador.co/go/echo/api"
-	"elprogramador.co/go/echo/database"
-	"elprogramador.co/go/echo/models"
+	config "elprogramador.co/go/echo/config"
 	"github.com/go-playground/validator/v10"
-	"github.com/golang-jwt/jwt/v4"
 	"github.com/labstack/echo/v4"
 )
 
@@ -47,60 +52,61 @@ func (cv *CustomValidator) Validate(i interface{}) error {
 }
 
 func main() {
-	e := echo.New()
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+
+	if os.Getenv("GO_ENV") != "production" {
+		_ = godotenv.Load(".env")
+	}
 
 	// Database
 	database.DBConnection()
-	err := database.DB.AutoMigrate(models.User{})
-	if err != nil {
+	if err := database.DB.AutoMigrate(models.User{}); err != nil {
+		return
+	}
+	if err := database.DB.AutoMigrate(models.Chat{}); err != nil {
 		return
 	}
 
-	// Middleware
-	// e.Use(middleware.Logger())
-	// e.Use(middleware.Recover())
-	// Configurar el middleware JWT
+	//if err := security.LoadRSAKeys(); err != nil {
+	//	log.Println("Err RSA Kes:", err)
+	//	os.Exit(0)
+	//}
+	//log.Println("RSA KEYS OK!")
+	//if err := database.PrepareConnection(); err != nil {
+	//	log.Println("Err database:", err)
+	//	os.Exit(0)
+	//}
+	//log.Println("Database connected")
+
+	e := echo.New()
+	e.HideBanner = true
+
+	middleware.StartMiddlewares(e)
+
+	routes.StartRoutes(e)
 
 	e.Validator = &CustomValidator{validator: validator.New()}
 
-	// Routes
-	e.GET("/", func(c echo.Context) error {
-		return c.String(http.StatusOK, "Hello, World!")
-	})
-	e.POST("/register", api.Register)
+	go func() {
+		// Wait for an interrupt signal
+		for sig := range c {
+			// Try to stop the Echo server
+			if err := e.Server.Shutdown(context.Background()); err != nil {
+				// If an error occurs while stopping the server, print an error message and exit the program
+				log.Println("error trying to stop echo service:", err)
+				return
+			}
+			// If the server stops successfully, print a log message and exit the program
+			log.Println("stopping echo service:", sig)
+			return
+		}
+	}()
 
-	type UserDTO struct {
-		Email string `json:"email"`
-	}
-	// e.Validator = &api.CustomValidator{validator: validator.New()}
-
-	// TODO: Activate login and add !Logout
-	e.POST("/login", api.Login)
-
-	// JWT configuration
-	keyBase64 := os.Getenv("PUBLIC_KEY")
-	keyData, _ := base64.StdEncoding.DecodeString(keyBase64)
-	key, _ := jwt.ParseRSAPublicKeyFromPEM(keyData)
-	config := echojwt.Config{
-		NewClaimsFunc: func(c echo.Context) jwt.Claims {
-			return new(structs.JwtCustomClaims)
-		},
-		SigningKey:    key,
-		SigningMethod: "RS256",
+	err := e.Start(config.FindEnvOrDefault("HOST", "localhost:1323"))
+	if err != nil {
+		log.Println("Error staring echo service:", err)
+		os.Exit(0)
 	}
 
-	// Restricted group with JWT middleware
-	apiRoute := e.Group("/api/v1")
-	apiRoute.Use(echojwt.WithConfig(config))
-	apiRoute.GET("/restricted", func(c echo.Context) error {
-		return c.String(http.StatusOK, "You are in the restricted area!")
-	})
-
-	// Configure middleware with the custom claims type
-
-	//r.Use(echojwt.WithConfig(config))
-	//r.GET("", handlers.Restricted)
-
-	// Start server
-	e.Logger.Fatal(e.Start(":1323"))
 }

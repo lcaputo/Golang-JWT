@@ -8,6 +8,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"elprogramador.co/go/echo/models"
@@ -23,6 +24,7 @@ func Register(c echo.Context) error {
 	}
 
 	var exist models.User
+
 	database.DB.First(&exist, "email = ?", u.Email)
 
 	fmt.Println(u.ID)
@@ -84,7 +86,9 @@ func getUserByEmail(email string) (*models.User, error) {
 	// consulta a la base de datos para buscar al usuario
 	// ...
 	u := new(models.User)
-	database.DB.First(&u, "email = ?", email)
+	// TODO FIX
+	//database.DB.First(&u, "email = ?", email)
+
 	if u.ID == 0 {
 		return nil, fmt.Errorf("user not found")
 	}
@@ -106,6 +110,8 @@ func Login(c echo.Context) error {
 	//if err != nil {
 	//	return err
 	//}
+	database.DB.First(&u, "email = ?", u.Email)
+
 	keyBase64 := os.Getenv("PRIVATE_KEY")
 	keyData, _ := base64.StdEncoding.DecodeString(keyBase64)
 	key, _ := jwt.ParseRSAPrivateKeyFromPEM(keyData)
@@ -118,13 +124,6 @@ func Login(c echo.Context) error {
 		"exp":       time.Now().Add(time.Hour * 24).Unix(),
 	})
 	signed, _ := token2.SignedString(key)
-	//token, _ := generateToken(user)
-	//token, _ := SignedLoginToken(user)
-	// generar un token JWT
-	//token, err := generateToken(user)
-	//if err != nil {
-	//	return err
-	//}
 	return SendResponse(c, http.StatusOK, "Login successful", signed)
 }
 
@@ -134,6 +133,45 @@ func SignedLoginToken(u *models.User) (string, error) {
 	})
 
 	return token.SignedString([]byte("mi_secreto"))
+}
+
+func TokenInfo(c echo.Context) error {
+	// obtener el token del request
+	tokenString := c.Request().Header.Get("Authorization")
+	tokenString = strings.Replace(tokenString, "Bearer ", "", 1)
+
+	fmt.Println(tokenString)
+	// Parse the token
+	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+		// Get the key from the public key file
+		keyBase64 := os.Getenv("PUBLIC_KEY")
+		keyData, _ := base64.StdEncoding.DecodeString(keyBase64)
+		publicKey, _ := jwt.ParseRSAPublicKeyFromPEM(keyData)
+
+		return publicKey, nil
+	})
+
+	// Check if there was an error parsing the token
+	if err != nil {
+		fmt.Printf("error parsing token: %v\n", err)
+		return err
+	}
+
+	// Check if the token is valid
+	if !token.Valid {
+		fmt.Printf("token is not valid\n")
+		return err
+	}
+
+	// Get the claims
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok {
+		fmt.Printf("error getting claims\n")
+		return err
+	}
+
+	return SendResponse(c, http.StatusOK, "Token info", claims)
+
 }
 
 // // Login : Login Router
